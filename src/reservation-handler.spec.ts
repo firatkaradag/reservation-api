@@ -13,7 +13,6 @@ import {
   parseHandler, queryHandler, fetchHandler
 } from './reservation-handlers';
 import { StartSyncExecutionOutput } from 'aws-sdk/clients/stepfunctions';
-import { GetObjectOutput } from 'aws-sdk/clients/s3';
 import { ExtrasFilter, Filter, StayFilter } from './filters';
 
 const ERROR_GENERIC_MESSAGE = "Please contact with system admin."

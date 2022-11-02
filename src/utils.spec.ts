@@ -1,5 +1,5 @@
 import {describe, expect, test, jest} from '@jest/globals';
-import { ExtrasFilter, Filter, StayFilter, ReservationFilter } from './filters';
+import { ExtrasFilter, Filter, StayFilter } from './filters';
 import { Extra } from './reservation';
 import { FilterUtil, JSONUtil, LogType, ResponseUtil, SystemLogger } from './utils';
 
