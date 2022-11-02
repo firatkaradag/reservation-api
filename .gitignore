@@ -6,4 +6,7 @@ jspm_packages
 .serverless
 .webpack
 
+# Jest test coverage
+coverage
+
 

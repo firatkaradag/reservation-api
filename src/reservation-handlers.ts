@@ -1,9 +1,10 @@
-import { APIGatewayProxyResult, APIGatewayEvent, Callback } from 'aws-lambda';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { APIGatewayProxyResult, APIGatewayEvent, Callback, Context } from 'aws-lambda';
 import { StepFunctions, S3 } from 'aws-sdk';
 import { StartSyncExecutionInput } from 'aws-sdk/clients/stepfunctions';
 import { ResponseUtil, JSONUtil, SystemLogger, FilterUtil } from './utils';
 import { v4 as uuid } from 'uuid';
-import { Extra, Reservation, ReservationShort, Stay } from './reservation'
+import { Reservation, ReservationShort } from './reservation';
 import { ExtrasFilter, Filter, ReservationFilter, StayFilter } from './filters';
 
 enum OperationType {
@@ -11,7 +12,6 @@ enum OperationType {
 }
 
 const awsConfig = { region: 'us-east-1'}
-const s3 = new S3(awsConfig)
 
 export const apiHandler = async (event: APIGatewayEvent): Promise<APIGatewayProxyResult> => {
 
@@ -37,8 +37,8 @@ export const apiHandler = async (event: APIGatewayEvent): Promise<APIGatewayProx
     SystemLogger.log('missing parameters')
     return ResponseUtil.getResponse(ERROR_GENERIC_MESSAGE, {}, 500)
   }
-  const operationType: OperationType = body["operationType"];
-  const data: Reservation = body["data"];
+  const operationType = body["operationType"];
+  const data = body["data"];
   const pageStart: number = body["pageStart"];
   const pageSize: number = body["pageSize"];
   if (!operationType) {
@@ -71,11 +71,7 @@ export const apiHandler = async (event: APIGatewayEvent): Promise<APIGatewayProx
   return ResponseUtil.getResponse("Unexpected result: ", response.output, 500)
 };
 
-type StateMachineEvent = {
-  reservations: Reservation[];
-  data: Reservation;
-}
-export const createHandler = (event: StateMachineEvent, callback: Callback) => { 
+export const createHandler = (event: any, _context: Context, callback: Callback) => { 
   SystemLogger.log('operation create event: ', event)
   const reservations: Reservation[] = event.reservations ?? [];
   const reservation: Reservation = event.data ?? null;
@@ -87,7 +83,7 @@ export const createHandler = (event: StateMachineEvent, callback: Callback) => {
   callback(null, {...event, reservations: reservations, reservation: reservation });
 };
 
-export const readHandler = (event: StateMachineEvent, callback: Callback) => {
+export const readHandler = (event: any, _context: Context, callback: Callback) => {
   SystemLogger.log('operation read event: ', event)
   const reservations: Reservation[] = event.reservations ?? [];
   const reservation = reservations.find(r => r.id == event.data.id)
@@ -95,18 +91,18 @@ export const readHandler = (event: StateMachineEvent, callback: Callback) => {
   callback(null, {...event, result: reservation });
 };
 
-export const updateHandler = (event: StateMachineEvent, callback: Callback) => {
+export const updateHandler = (event: any, _context: Context, callback: Callback) => {
   SystemLogger.log('operation update event: ', event)
   let reservations: Reservation[] = event.reservations ?? [];
   const reservation: Reservation = event.data ?? null
   if (reservation) {
     reservations = reservations.map(r => r.id == reservation.id ? reservation : r);
   }
-  
+  SystemLogger.log('updated reservations: ', reservations)
   callback(null, {...event, reservations: reservations, reservation: reservation });
 };
 
-export const deleteHandler = (event: StateMachineEvent, callback: Callback) => {
+export const deleteHandler = (event: any, _context: Context, callback: Callback) => {
   SystemLogger.log('operation delete event: ', event)
   let reservations: Reservation[] = event.reservations ?? [];
   const reservationId: string | undefined = event.data.id;
@@ -116,30 +112,23 @@ export const deleteHandler = (event: StateMachineEvent, callback: Callback) => {
   callback(null, {...event, reservations: reservations });
 };
 
-type StateMachineS3Event = StateMachineEvent & {
-  reservation: Reservation;
-  s3BucketName: string;
-  s3Key: string;
-}
-export const saveHandler = async (event: StateMachineS3Event) => {
+export const saveHandler = async (event: any) => {
   const reservations: Reservation[] = event.reservations ?? [];
   SystemLogger.log("reservations: ", reservations);
   if (event.s3BucketName && event.s3Key) {
+    const s3 = new S3(awsConfig)
     const response = await s3.putObject({
       Bucket: event.s3BucketName, 
       Key: event.s3Key,
       Body: JSON.stringify(reservations)
     }).promise()
-    SystemLogger.log("response: ", response);
+    SystemLogger.log("save response: ", response);
   }
 
   return { result: event.reservation ? event.reservation : true };
 };
 
-type StateMachineFilterEvent = {
-  data: { extras: Extra[], stay: Stay };
-}
-export const parseHandler = (event: StateMachineFilterEvent, callback: Callback) => { 
+export const parseHandler = (event: any, _context: Context, callback: Callback) => { 
   
   const filters: Filter[] = [];
   if (event && event.data) {
@@ -154,9 +143,10 @@ export const parseHandler = (event: StateMachineFilterEvent, callback: Callback)
   callback(null, {...event, filters: filters });
 };
 
-export const queryHandler = async (event: StateMachineS3Event) => {
+export const queryHandler = async (event: any) => {
   let reservations: Reservation[] = []
   if (event.s3BucketName && event.s3Key) {
+    const s3 = new S3(awsConfig)
     const response = await s3.getObject({Bucket: event.s3BucketName, Key: event.s3Key}).promise()
     SystemLogger.log("response: ", response);
     if (response && response.Body) {
@@ -169,13 +159,7 @@ export const queryHandler = async (event: StateMachineS3Event) => {
   return output;
 };
 
-type StateMachineInputEvent = StateMachineS3Event & {
-  filters: Filter[],
-  pagination: boolean,
-  pageStart: number,
-  pageSize: number,
-}
-export const fetchHandler = (event: StateMachineInputEvent, callback: Callback) => {
+export const fetchHandler = (event: any, _context: Context, callback: Callback) => {
   
   let reservations: Reservation[] = event.reservations ?? [];
   SystemLogger.log("reservations: ", reservations);
@@ -197,5 +181,5 @@ export const fetchHandler = (event: StateMachineInputEvent, callback: Callback) 
 
   const reservationShortList: ReservationShort[] = reservations.map(r => r as ReservationShort);
   SystemLogger.log("reservationShortList: ", reservationShortList);
-  callback(null, {...event, result: reservations });
+  callback(null, {...event, result: reservationShortList });
 };

@@ -1,7 +1,7 @@
 import { APIGatewayProxyResult } from 'aws-lambda';
 import { S3 } from 'aws-sdk';
 import { ExtrasFilter, Filter, FilterType, ReservationFilter, StayFilter } from './filters';
-import { Extra, Stay } from './reservation';
+import { Extra, Reservation, Stay } from './reservation';
 
 export class ResponseUtil {
   static getResponse(msg: string, data: object | string | undefined, statusCode: number): APIGatewayProxyResult {
@@ -30,14 +30,11 @@ export class JSONUtil {
   }
 
   static bufferToJSON(buffer: S3.Body) {
-    if (buffer) {
-      try {
-        return JSON.parse(buffer.toString('utf-8'))
-      } catch (e) {
-        console.log("cannot parse buffer to json! (" + e + ")", buffer)
-      }
+    try {
+      return JSON.parse(buffer.toString('utf-8'))
+    } catch (e) {
+      console.log("cannot parse buffer to json! (" + e + ")", buffer)
     }
-        
     return []
   }
 }
@@ -59,7 +56,7 @@ export enum LogType {
 }
   
 export class SystemLogger { 
-  static log(msg: string, data: unknown = {}, type: LogType = LogType.DEBUG, force = false) { 
+  static log(msg: string, data: Reservation | object | string | number | undefined = {}, type: LogType = LogType.DEBUG, force = false) { 
     if (DEBUGGER || force) {
       switch (type) {
         case LogType.DEBUG: console.log(msg, data); break;
