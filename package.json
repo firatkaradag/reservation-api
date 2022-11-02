@@ -1,0 +1,28 @@
+{
+  "name": "reservation-api",
+  "description": "IDEMIA Reservation API",
+  "version": "1.0.0",
+  "author": "Firat Karadag",
+  "license": "ISC",
+  "scripts": {
+    "package": "sls package --stage dev",
+    "deploy": "sls deploy --stage dev",
+    "webpack": "sls webpack --stage dev",
+    "remove": "sls remove --stage dev"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.108",
+    "fork-ts-checker-webpack-plugin": "^7.2.13",
+    "serverless-iam-roles-per-function": "^3.2.0",
+    "serverless-step-functions": "^3.10.0",
+    "serverless-webpack": "^5.10.0",
+    "ts-loader": "^9.4.1",
+    "webpack": "^5.74.0",
+    "webpack-node-externals": "^3.0.0"
+  },
+  "dependencies": {
+    "@types/uuid": "^8.3.4",
+    "aws-sdk": "^2.1239.0",
+    "uuid": "^9.0.0"
+  }
+}

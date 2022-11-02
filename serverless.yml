@@ -1,0 +1,194 @@
+org: fkaradag
+app: reservation
+service: reservation-api
+frameworkVersion: '3'
+
+plugins:
+  - serverless-step-functions
+  - serverless-webpack
+  - serverless-iam-roles-per-function
+
+custom:
+  stage: ${opt:stage, 'dev'}
+  webpack:
+    webpackConfig: "webpack.config.js"
+    includeModules:
+      forceInclude:
+        - uuid
+      forceExclude:
+        - aws-sdk
+
+    packager: "npm"
+    excludeFiles: test/**/*.spec.ts
+    keepOutputDirectory: true
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  httpApi:
+    cors: &api-cors
+      allowedOrigins: '*'
+      allowedMethods:
+        - OPTIONS
+        - POST
+      allowedHeaders:
+        - Content-Type
+        - X-Amz-Date
+        - Authorization
+        - X-Api-Key
+        - X-Amz-Security-Token
+        - X-Amz-User-Agent
+      allowCredentials: false
+      
+package:
+  patterns: 
+    - '!node_modules/**'
+
+functions:
+  apiReservation:
+    handler: src/reservation-handlers.apiHandler
+    iamRoleStatements: 
+      - Effect: "Allow"
+        Action:
+          - states:StartExecution
+          - states:StartSyncExecution
+          - states:DescribeExecution
+        Resource: "*"
+    environment:
+      CRUD_STATEMACHINE_ARN: 
+        Fn::GetAtt: [ReservationStateMachine, Arn]
+      SEARCH_STATEMACHINE_ARN: 
+        Fn::GetAtt: [SearchReservationStateMachine, Arn]
+      RESERVATION_S3_DB: !Ref S3BucketReservationDB
+      RESERVATION_S3_JSON: 'reservations.json'
+    events:
+      - httpApi:
+          path: /reservation/{proxy+}
+          method: OPTIONS
+      - httpApi:
+          path: /reservation
+          method: POST
+  createReservation:
+    handler: src/reservation-handlers.createHandler
+  readReservation:
+    handler: src/reservation-handlers.readHandler
+  updateReservation:
+    handler: src/reservation-handlers.updateHandler
+  deleteReservation:
+    handler: src/reservation-handlers.deleteHandler
+  saveReservation:
+    handler: src/reservation-handlers.saveHandler
+    iamRoleStatements: 
+      - Effect: "Allow"
+        Action:
+          - s3:PutObject
+        Resource: "*"
+  parseReservation:
+    handler: src/reservation-handlers.parseHandler
+  queryReservation:
+    handler: src/reservation-handlers.queryHandler
+    iamRoleStatements: 
+      - Effect: "Allow"
+        Action:
+          - s3:GetObject
+        Resource: "*"
+  fetchReservation:
+    handler: src/reservation-handlers.fetchHandler
+
+stepFunctions:
+  stateMachines:
+    ReservationStateMachine:
+      id: ReservationStateMachine
+      name: reservation-state-machine-${self:custom.stage}
+      type: EXPRESS
+      definition:
+        StartAt: QueryReservation
+        States:
+          QueryReservation:
+            Type: Task
+            Resource:
+              Fn::GetAtt: [queryReservation, Arn]
+            Next: CrudOperationChoice
+          CrudOperationChoice:
+            Type: Choice
+            Choices: [
+              { 
+                "Variable": "$.operationType",
+                "NumericEquals": 2,
+                "Next": "CreateReservationOperation"
+              },
+              { 
+                "Variable": "$.operationType",
+                "NumericEquals": 3,
+                "Next": "ReadReservationOperation"
+              },
+              { 
+                "Variable": "$.operationType",
+                "NumericEquals": 4,
+                "Next": "UpdateReservationOperation"
+              },
+              { 
+                "Variable": "$.operationType",
+                "NumericEquals": 5,
+                "Next": "DeleteReservationOperation"
+              }
+            ]
+          CreateReservationOperation:
+            Type: Task
+            Resource:
+              Fn::GetAtt: [createReservation, Arn]
+            Next: SaveReservationOperation
+          ReadReservationOperation:
+            Type: Task
+            Resource:
+              Fn::GetAtt: [readReservation, Arn]
+            End: true
+          UpdateReservationOperation:
+            Type: Task
+            Resource:
+              Fn::GetAtt: [updateReservation, Arn]
+            Next: SaveReservationOperation
+          DeleteReservationOperation:
+            Type: Task
+            Resource:
+              Fn::GetAtt: [deleteReservation, Arn]
+            Next: SaveReservationOperation
+          SaveReservationOperation:
+            Type: Task
+            Resource:
+              Fn::GetAtt: [saveReservation, Arn]
+            End: true
+      tags:
+        Project: IDEMIA
+
+    SearchReservationStateMachine:
+      id: SearchReservationStateMachine
+      name: search-reservation-state-machine-${self:custom.stage}
+      type: EXPRESS
+      definition:
+        StartAt: ParseReservation
+        States:
+          ParseReservation:
+            Type: Task
+            Resource:
+              Fn::GetAtt: [parseReservation, Arn]
+            Next: QueryReservation
+          QueryReservation:
+            Type: Task
+            Resource:
+              Fn::GetAtt: [queryReservation, Arn]
+            Next: FetchReservation
+          FetchReservation:
+            Type: Task
+            Resource:
+              Fn::GetAtt: [fetchReservation, Arn]
+            End: true
+      tags:
+        Project: IDEMIA
+
+resources:
+  Resources:
+    S3BucketReservationDB:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: reservation-db-${self:custom.stage}
