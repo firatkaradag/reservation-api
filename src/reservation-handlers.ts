@@ -37,9 +37,9 @@ export const apiHandler = async (event: APIGatewayEvent, context: Context): Prom
     return ResponseUtil.getResponse(ERROR_GENERIC_MESSAGE, {}, 500)
   }
   const operationType = body["operationType"];
-  const data = body["Data"];
-  const pageStart = body["PageStart"];
-  const pageSize = body["PageSize"];
+  const data = body["data"];
+  const pageStart = body["pageStart"];
+  const pageSize = body["pageSize"];
   if (!operationType) {
     return ResponseUtil.getResponse("missing operation type", {}, 500)
   }
