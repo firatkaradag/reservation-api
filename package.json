@@ -12,6 +12,9 @@
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.108",
+    "@typescript-eslint/eslint-plugin": "^5.42.0",
+    "@typescript-eslint/parser": "^5.42.0",
+    "eslint": "^8.26.0",
     "fork-ts-checker-webpack-plugin": "^7.2.13",
     "serverless-iam-roles-per-function": "^3.2.0",
     "serverless-step-functions": "^3.10.0",
